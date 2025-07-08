@@ -4,7 +4,8 @@ use crate::core::{extract_docinfo, extract_pyfiles, list_files};
 
 #[pyfunction]
 fn entry_point(path: String) -> PyResult<()> {
-    dbg!(extract_docinfo(extract_pyfiles(list_files(path))));
+    let infos = dbg!(extract_docinfo(extract_pyfiles(list_files(path))));
+    dbg!(infos[3].to_readme());
     Ok(())
 }
 
@@ -58,15 +59,22 @@ mod core {
             .and_then(|caught| caught.get(1).map(|m| m.as_str().to_string()))
             .unwrap_or_default()
     }
-    #[derive(Debug)]
+    #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
     pub struct DocInfo {
         path: PathBuf,
         desc: String,
         link: String,
     }
 
+    impl DocInfo {
+        pub fn to_readme(&self) -> String {
+            let basename: String = self.path.file_name().unwrap().to_string_lossy().to_string();
+            format!("| {} | {} | {} |", basename, self.desc, self.link)
+        }
+    }
+
     pub fn extract_docinfo(py_files: Vec<PyFile>) -> Vec<DocInfo> {
-        py_files
+        let mut doc_infos: Vec<DocInfo> = py_files
             .into_iter()
             .map(|py_file| {
                 let mut desc = String::new();
@@ -87,6 +95,8 @@ mod core {
                     link,
                 }
             })
-            .collect()
+            .collect();
+        doc_infos.sort();
+        doc_infos
     }
 }
