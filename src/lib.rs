@@ -1,11 +1,11 @@
 use pyo3::prelude::*;
 
-use crate::core::{extract_docinfo, extract_pyfiles, list_files};
+use crate::core::{create_readme, extract_docinfo, extract_pyfiles, list_files};
 
 #[pyfunction]
 fn entry_point(path: String) -> PyResult<()> {
-    let infos = dbg!(extract_docinfo(extract_pyfiles(list_files(path))));
-    dbg!(infos[3].to_readme());
+    let infos = create_readme(extract_docinfo(extract_pyfiles(list_files(path))));
+    println!("{}", infos);
     Ok(())
 }
 
@@ -16,6 +16,7 @@ fn rs_py_experiment(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 mod core {
+    use rayon::prelude::*;
     use regex::Regex;
     use std::{ffi::OsStr, fs, path::PathBuf};
     use walkdir::WalkDir;
@@ -38,7 +39,7 @@ mod core {
 
     pub fn extract_pyfiles(paths: Vec<PathBuf>) -> Vec<PyFile> {
         paths
-            .into_iter()
+            .into_par_iter()
             .filter_map(|path| {
                 fs::read_to_string(&path).ok().map(|code| {
                     let docstring = extract_module_docstring(&code);
@@ -75,7 +76,7 @@ mod core {
 
     pub fn extract_docinfo(py_files: Vec<PyFile>) -> Vec<DocInfo> {
         let mut doc_infos: Vec<DocInfo> = py_files
-            .into_iter()
+            .into_par_iter()
             .map(|py_file| {
                 let mut desc = String::new();
                 let mut link = String::new();
@@ -86,7 +87,7 @@ mod core {
                     if let Some(rest) = trimmed_line.strip_prefix("Description: ") {
                         desc = rest.to_string();
                     } else if let Some(rest) = trimmed_line.strip_prefix("Link: ") {
-                        link = rest.to_string();
+                        link = format!("[Link]({})", rest);
                     }
                 }
                 DocInfo {
@@ -96,7 +97,16 @@ mod core {
                 }
             })
             .collect();
-        doc_infos.sort();
+        doc_infos.par_sort_by_key(|s| s.path.clone());
         doc_infos
+    }
+
+    pub fn create_readme(doc_infos: Vec<DocInfo>) -> String {
+        let readme = std::iter::once("# Scripts".to_string())
+            .chain(doc_infos.iter().map(|n| n.to_readme()).collect::<Vec<_>>())
+            .chain(std::iter::once("::".to_string()))
+            .collect::<Vec<_>>()
+            .join("\n");
+        readme
     }
 }
