@@ -40,8 +40,7 @@ jobs:
             with:
                 name: Packages-${{ matrix.os }}
                 path: dist
-        -   name: Show dist contents
-            run: ls -lh dist || echo "No dist directory found"
+
     release-test-pypi:
         name: Publish in-dev package to test.pypi.org
         environment: release-test-pypi
