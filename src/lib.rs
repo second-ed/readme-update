@@ -1,4 +1,4 @@
-use std::process::{self, ExitCode};
+use std::{path::Path, process::ExitCode};
 
 use pyo3::prelude::*;
 
@@ -6,7 +6,7 @@ use crate::core::main;
 
 #[pyfunction]
 fn py_main(scripts_root: String, readme_path: String) -> PyResult<i8> {
-    match main(scripts_root, readme_path) {
+    match main(scripts_root, Path::new(&readme_path)) {
         ExitCode::SUCCESS => Ok(0),
         ExitCode::FAILURE => Ok(1),
         _ => Ok(-1),
@@ -23,20 +23,44 @@ mod core {
     use colored::Colorize;
     use rayon::prelude::*;
     use regex::Regex;
-    use std::process::ExitCode;
-    use std::{ffi::OsStr, fs, io, ops::Deref, path::PathBuf};
+    use std::{
+        ffi::OsStr,
+        fs, io,
+        ops::Deref,
+        path::{Path, PathBuf},
+        process::ExitCode,
+    };
     use walkdir::WalkDir;
 
-    pub fn main(scripts_root: String, readme_path: String) -> ExitCode {
-        let paths: Vec<PathBuf> = list_files(scripts_root);
+    pub fn main(scripts_root: String, readme_path: &Path) -> ExitCode {
         // may as well exit early if no readme
-        let readme = ReadMeString::read(&readme_path).expect("Failed to read README.md");
-        let scripts_docs = generate_scripts_docs(paths);
+        let readme = match ReadMeString::read(readme_path) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("{} {}", "Failed to read README file: ".red().bold(), e);
+                return ExitCode::FAILURE;
+            }
+        };
+
+        let paths = list_files(&scripts_root);
+        if paths.is_empty() {
+            println!(
+                "{} `{}`",
+                "No files to analyse at path: ".red().bold(),
+                scripts_root.clone().yellow()
+            );
+            return ExitCode::FAILURE;
+        }
+
+        let py_files: Vec<PyFile> = extract_pyfiles(paths);
+        let scripts_docs = generate_scripts_docs(py_files);
         let modified_readme = update_readme(&readme, scripts_docs);
+
         if modified_readme != readme {
-            modified_readme
-                .write(&readme_path)
-                .expect("Failed to write modified README.md");
+            if let Err(e) = modified_readme.write(readme_path) {
+                eprintln!("{} {}", "Failed to write README file: ".red().bold(), e);
+                return ExitCode::FAILURE;
+            };
             println!("{}", "Modified README.md".yellow().bold());
             return ExitCode::FAILURE;
         }
@@ -44,7 +68,53 @@ mod core {
         ExitCode::SUCCESS
     }
 
-    pub fn list_files(path: String) -> Vec<PathBuf> {
+    #[derive(Debug, Eq, PartialEq)]
+    struct ReadMeString(String);
+
+    impl ReadMeString {
+        pub fn read(path: &Path) -> Result<Self, io::Error> {
+            let allowed_exts = ["md", "rst", "txt"];
+            let ext = path
+                .extension()
+                .and_then(OsStr::to_str)
+                .unwrap_or("")
+                .to_ascii_lowercase();
+
+            let valid_ext = allowed_exts.contains(&ext.as_str());
+
+            let valid_file_name = path
+                .file_name()
+                .and_then(OsStr::to_str)
+                .map(|name| name.to_ascii_uppercase().contains("README"))
+                .unwrap_or(false);
+
+            if valid_file_name && valid_ext {
+                fs::read_to_string(path).map(ReadMeString)
+            } else {
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "File name does not contain `README` or is not valid extension in {:?}",
+                        allowed_exts
+                    ),
+                ))
+            }
+        }
+
+        pub fn write(&self, path: &Path) -> Result<(), io::Error> {
+            fs::write(path, &self.0)
+        }
+    }
+
+    impl Deref for ReadMeString {
+        type Target = str;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    pub fn list_files(path: &String) -> Vec<PathBuf> {
         WalkDir::new(path)
             .into_iter()
             .filter_map(Result::ok)
@@ -55,22 +125,28 @@ mod core {
 
     #[derive(Debug)]
     struct PyFile {
-        path: PathBuf,
+        pub path: PathBuf,
         code: String,
         docstring: String,
+    }
+
+    impl PyFile {
+        fn new(path: PathBuf, code: &str, docstring: &str) -> Self {
+            Self {
+                path,
+                code: code.to_string(),
+                docstring: docstring.to_string(),
+            }
+        }
     }
 
     fn extract_pyfiles(paths: Vec<PathBuf>) -> Vec<PyFile> {
         paths
             .into_par_iter()
             .filter_map(|path| {
-                fs::read_to_string(&path).ok().map(|code| {
-                    let docstring = extract_module_docstring(&code);
-                    PyFile {
-                        path,
-                        code,
-                        docstring,
-                    }
+                fs::read_to_string(&path).ok().as_ref().map(|code| {
+                    let docstring = extract_module_docstring(code);
+                    PyFile::new(path, code, &docstring)
                 })
             })
             .collect()
@@ -138,28 +214,8 @@ mod core {
         .join("\n")
     }
 
-    fn generate_scripts_docs(paths: Vec<PathBuf>) -> String {
-        create_readme(extract_docinfo(extract_pyfiles(paths)))
-    }
-    #[derive(Debug, Eq, PartialEq)]
-    struct ReadMeString(String);
-
-    impl ReadMeString {
-        pub fn read(path: &String) -> Result<Self, io::Error> {
-            fs::read_to_string(path).map(ReadMeString)
-        }
-
-        pub fn write(&self, path: &String) -> Result<(), io::Error> {
-            fs::write(path, &self.0)
-        }
-    }
-
-    impl Deref for ReadMeString {
-        type Target = str;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
+    fn generate_scripts_docs(py_files: Vec<PyFile>) -> String {
+        create_readme(extract_docinfo(py_files))
     }
 
     fn update_readme(readme: &ReadMeString, scripts_docs: String) -> ReadMeString {
@@ -171,5 +227,46 @@ mod core {
             format!("{}\n\n{}", readme.0, scripts_docs)
         };
         ReadMeString(updated)
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_generate_scripts_docs() {
+            let py_files = vec![
+                PyFile::new(
+                    PathBuf::from("some/python/file1.py"),
+                    "",
+                    "Description: This is a description\n\nLink: some_link.com/link1",
+                ),
+                PyFile::new(
+                    PathBuf::from("some/python/file3.py"),
+                    "",
+                    "missing description start\n\nLink: some_other_link.com/link2",
+                ),
+                PyFile::new(
+                    PathBuf::from("some/python/file2.py"),
+                    "",
+                    "Description: This is another description\n\n",
+                ),
+            ];
+
+            let expected_readme = [
+                "# Scripts",
+                "| Name | Description | Link |",
+                "|:---|:---|:---|",
+                "| `file1.py` | This is a description | [Link](some_link.com/link1) |",
+                "| `file2.py` | This is another description |  |",
+                "| `file3.py` |  | [Link](some_other_link.com/link2) |",
+                "::",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<String>>()
+            .join("\n");
+
+            assert_eq!(generate_scripts_docs(py_files), expected_readme);
+        }
     }
 }
