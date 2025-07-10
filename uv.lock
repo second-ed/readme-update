@@ -7,5 +7,5 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "rs-py-experiment"
+name = "readme-update"
 source = { editable = "." }

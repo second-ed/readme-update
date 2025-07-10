@@ -14,7 +14,7 @@ fn py_main(scripts_root: String, readme_path: String) -> PyResult<i8> {
 }
 
 #[pymodule]
-fn rs_py_experiment(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn readme_update(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_main, m)?)?;
     Ok(())
 }
@@ -33,7 +33,6 @@ mod core {
     use walkdir::WalkDir;
 
     pub fn main(scripts_root: String, readme_path: &Path) -> ExitCode {
-        // may as well exit early if no readme
         let readme = match ReadMeString::read(readme_path) {
             Ok(r) => r,
             Err(e) => {

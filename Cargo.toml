@@ -1,11 +1,11 @@
 [package]
-name = "rs-py-experiment"
+name = "readme-update"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "rs_py_experiment"
+name = "readme_update"
 crate-type = ["cdylib"]
 
 [dependencies]
