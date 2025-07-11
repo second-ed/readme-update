@@ -1,76 +1,75 @@
 name: Build & maybe upload PyPI package
 'on':
-    push:
-        branches:
-        - main
-        tags:
-        - '*'
-    pull_request:
-        branches:
-        - main
-    release:
-        types:
-        - published
-    workflow_dispatch:
+  push:
+    branches:
+    - main
+    tags:
+    - '*'
+  pull_request:
+    branches:
+    - main
+  release:
+    types:
+    - published
+  workflow_dispatch: null
 permissions:
-    contents: read
-    id-token: write
+  contents: read
+  id-token: write
 jobs:
-    build-package:
-        name: Build & verify package
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os:
-                - ubuntu-latest
-                - windows-latest
-                - macos-latest
-        steps:
-        -   name: checkout repo
-            uses: actions/checkout@v4
-            with:
-                fetch-depth: 0
-        -   name: Build wheels with maturin
-            uses: PyO3/maturin-action@v1
-            with:
-                command: build
-                args: --release --out dist --sdist --verbose
-        -   name: Upload built packages
-            uses: actions/upload-artifact@v4
-            with:
-                name: Packages-${{ matrix.os }}
-                path: dist
+  build-package:
+    name: Build & verify package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+        - ubuntu-latest
+        - windows-latest
+        - macos-latest
+    steps:
+    - name: checkout repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Build wheels with maturin
+      uses: PyO3/maturin-action@v1
+      with:
+        command: build
+        args: --release --out dist --sdist --verbose
+    - name: Upload built packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: Packages-${{ matrix.os }}
+        path: dist
+  release-test-pypi:
+    name: Publish in-dev package to test.pypi.org
+    environment: release-test-pypi
+    if: github.repository_owner == 'second-ed' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: build-package
+    steps:
+    - name: Download packages built by build-and-inspect-python-package
+      uses: actions/download-artifact@v4
+      with:
+        pattern: Packages-*
+        path: dist
+        merge-multiple: true
+    - name: Upload package to Test PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+  release-pypi:
+    name: Publish released package to pypi.org
+    environment: release-pypi
+    if: github.repository_owner == 'second-ed' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    needs: build-package
+    steps:
+    - name: Download packages built by build-and-inspect-python-package
+      uses: actions/download-artifact@v4
+      with:
+        pattern: Packages-*
+        path: dist
+        merge-multiple: true
+    - name: Upload package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
 
-    release-test-pypi:
-        name: Publish in-dev package to test.pypi.org
-        environment: release-test-pypi
-        if: github.repository_owner == 'second-ed' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        needs: build-package
-        steps:
-        -   name: Download packages built by build-and-inspect-python-package
-            uses: actions/download-artifact@v4
-            with:
-                pattern: Packages-*
-                path: dist
-                merge-multiple: true
-        -   name: Upload package to Test PyPI
-            uses: pypa/gh-action-pypi-publish@release/v1
-            with:
-                repository-url: https://test.pypi.org/legacy/
-                
-    release-pypi:
-        name: Publish released package to pypi.org
-        environment: release-pypi
-        if: github.repository_owner == 'second-ed' && github.event.action == 'published'
-        runs-on: ubuntu-latest
-        needs: build-package
-        steps:
-        -   name: Download packages built by build-and-inspect-python-package
-            uses: actions/download-artifact@v4
-            with:
-                pattern: Packages-*
-                path: dist
-                merge-multiple: true
-        -   name: Upload package to PyPI
-            uses: pypa/gh-action-pypi-publish@release/v1
