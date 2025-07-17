@@ -18,5 +18,29 @@ It will update in place if the `# Scripts` block exists or else it will append i
 | `example_usage.py` |  |  |
 ::
 
-# Some line afterwards
-blah blah
+# To install the package
+```shell
+pip install readme-update
+```
+
+# Usage 
+Assuming its is run from this location.
+```shell
+root/
+  scripts/
+    example_script.py
+  README.md
+```
+
+# example_script.py
+```python
+import readme_update
+from pathlib import Path
+
+path = Path(__file__)
+
+readme_update.py_main(
+    str(path.parent),
+    str(path.parents[1] / "README.md")
+)
+```
