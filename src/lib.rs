@@ -33,7 +33,7 @@ mod core {
     use walkdir::WalkDir;
 
     pub fn main(scripts_root: String, readme_path: &Path) -> ExitCode {
-        let readme = match ReadMeString::read(readme_path) {
+        let readme = match ReadMe::read(readme_path) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("{} {}", "Failed to read README file: ".red().bold(), e);
@@ -68,9 +68,9 @@ mod core {
     }
 
     #[derive(Debug, Eq, PartialEq)]
-    struct ReadMeString(String);
+    struct ReadMe(String);
 
-    impl ReadMeString {
+    impl ReadMe {
         pub fn read(path: &Path) -> Result<Self, io::Error> {
             let allowed_exts = ["md", "rst", "txt"];
             let ext = path
@@ -88,7 +88,7 @@ mod core {
                 .unwrap_or(false);
 
             if valid_file_name && valid_ext {
-                fs::read_to_string(path).map(ReadMeString)
+                fs::read_to_string(path).map(ReadMe)
             } else {
                 Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -105,7 +105,7 @@ mod core {
         }
     }
 
-    impl Deref for ReadMeString {
+    impl Deref for ReadMe {
         type Target = str;
 
         fn deref(&self) -> &Self::Target {
@@ -217,7 +217,7 @@ mod core {
         create_readme(extract_docinfo(py_files))
     }
 
-    fn update_readme(readme: &ReadMeString, scripts_docs: String) -> ReadMeString {
+    fn update_readme(readme: &ReadMe, scripts_docs: String) -> ReadMe {
         let pattern = Regex::new(r"(?s)(?m)^# Scripts.*?^::").expect("valid regex");
 
         let updated = if pattern.is_match(&readme.0) {
@@ -225,7 +225,7 @@ mod core {
         } else {
             format!("{}\n\n{}", readme.0, scripts_docs)
         };
-        ReadMeString(updated)
+        ReadMe(updated)
     }
     #[cfg(test)]
     mod tests {
