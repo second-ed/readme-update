@@ -52,6 +52,10 @@ readme_update.py_main(
 │   └── workflows
 │       ├── ci.yaml
 │       └── publish.yaml
+├── python
+│   └── update_readme
+│       ├── __init__.py
+│       └── __main__.py
 ├── scripts
 │   ├── example1.py
 │   ├── example2.py

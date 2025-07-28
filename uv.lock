@@ -122,6 +122,7 @@ wheels = [
 
 [[package]]
 name = "readme-update"
+version = "0.1.2"
 source = { editable = "." }
 
 [package.dev-dependencies]

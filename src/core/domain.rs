@@ -5,7 +5,6 @@ use regex::Regex;
 use std::{
     ffi::OsStr,
     io,
-    ops::Deref,
     path::{Path, PathBuf},
 };
 
@@ -89,14 +88,6 @@ impl ReadMe {
 
     pub fn write(&self, file_sys: &mut impl FileSystem, path: &Path) -> Result<(), io::Error> {
         file_sys.write(path, &self.0)
-    }
-}
-
-impl Deref for ReadMe {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
