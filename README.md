@@ -23,7 +23,7 @@ It will update in place if the `# Scripts` block exists or else it will append i
 pip install readme-update
 ```
 
-# Usage 
+# Usage
 Assuming its is run from this location.
 ```shell
 root/
@@ -43,4 +43,32 @@ readme_update.py_main(
     str(path.parent),
     str(path.parents[1] / "README.md")
 )
+```
+
+
+# Repo map
+```
+├── .github
+│   └── workflows
+│       ├── ci.yaml
+│       └── publish.yaml
+├── scripts
+│   ├── example1.py
+│   ├── example2.py
+│   ├── example3.py
+│   └── example_usage.py
+├── src
+│   ├── core
+│   │   ├── adapters.rs
+│   │   ├── domain.rs
+│   │   └── mod.rs
+│   ├── api.rs
+│   └── lib.rs
+├── .pre-commit-config.yaml
+├── Cargo.lock
+├── Cargo.toml
+├── README.md
+├── pyproject.toml
+└── uv.lock
+::
 ```
