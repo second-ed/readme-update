@@ -64,6 +64,8 @@ readme_update.py_main(
 │   │   └── mod.rs
 │   ├── api.rs
 │   └── lib.rs
+├── tests
+│   └── integration_tests.rs
 ├── .pre-commit-config.yaml
 ├── Cargo.lock
 ├── Cargo.toml

@@ -52,7 +52,6 @@ pub enum RetCode {
     FailedParsingFile,
     FailedToWriteReadme,
     InvalidFilename,
-    InvalidExtension,
 }
 
 #[derive(Debug, Eq, PartialEq)]
