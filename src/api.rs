@@ -1,15 +1,19 @@
 use crate::core::adapters::RealFileSystem;
-use crate::core::domain::main;
+use crate::core::domain::{main, RetCode};
 use pyo3::prelude::*;
-use std::{path::Path, process::ExitCode};
+use std::path::Path;
 
 #[pyfunction]
 fn py_main(scripts_root: String, readme_path: String) -> PyResult<i8> {
     let mut file_sys = RealFileSystem;
     match main(&mut file_sys, scripts_root, Path::new(&readme_path)) {
-        ExitCode::SUCCESS => Ok(0),
-        ExitCode::FAILURE => Ok(1),
-        _ => Ok(-1),
+        RetCode::NoModification => Ok(0),
+        RetCode::ModifiedReadme => Ok(1),
+        RetCode::NoPyFiles => Ok(2),
+        RetCode::FailedParsingFile => Ok(3),
+        RetCode::FailedToWriteReadme => Ok(4),
+        RetCode::InvalidFilename => Ok(5),
+        RetCode::InvalidExtension => Ok(6),
     }
 }
 

@@ -7,26 +7,25 @@ use std::{
     io,
     ops::Deref,
     path::{Path, PathBuf},
-    process::ExitCode,
 };
 
-pub fn main(file_sys: &mut impl FileSystem, scripts_root: String, readme_path: &Path) -> ExitCode {
-    let readme = match ReadMe::read(file_sys, readme_path) {
+pub fn main(file_sys: &mut impl FileSystem, scripts_root: String, readme_path: &Path) -> RetCode {
+    let readme = match ReadMe::parse(file_sys, readme_path) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("{} {}", "Failed to read README file: ".red().bold(), e);
-            return ExitCode::FAILURE;
+            return RetCode::FailedParsingFile;
         }
     };
 
-    let paths = file_sys.list_files(&scripts_root);
+    let paths = file_sys.list_py_files(&scripts_root);
     if paths.is_empty() {
         println!(
             "{} `{}`",
             "No files to analyse at path: ".red().bold(),
             scripts_root.clone().yellow()
         );
-        return ExitCode::FAILURE;
+        return RetCode::NoPyFiles;
     }
 
     let py_files: Vec<PyFile> = extract_pyfiles(file_sys, paths);
@@ -36,19 +35,20 @@ pub fn main(file_sys: &mut impl FileSystem, scripts_root: String, readme_path: &
     if modified_readme != readme {
         if let Err(e) = modified_readme.write(file_sys, readme_path) {
             eprintln!("{} {}", "Failed to write README file: ".red().bold(), e);
-            return ExitCode::FAILURE;
+            return RetCode::FailedToWriteReadme;
         };
         println!("{}", "Modified README.md".yellow().bold());
-        return ExitCode::FAILURE;
+        return RetCode::ModifiedReadme;
     }
     println!("{}", "Nothing to modify".green().bold());
-    ExitCode::SUCCESS
+    RetCode::NoModification
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RetCode {
     NoModification,
     ModifiedReadme,
+    NoPyFiles,
     FailedParsingFile,
     FailedToWriteReadme,
     InvalidFilename,
@@ -59,7 +59,7 @@ pub enum RetCode {
 struct ReadMe(String);
 
 impl ReadMe {
-    pub fn read(file_sys: &mut impl FileSystem, path: &Path) -> Result<Self, io::Error> {
+    pub fn parse(file_sys: &mut impl FileSystem, path: &Path) -> Result<Self, io::Error> {
         let allowed_exts = ["md", "rst", "txt"];
         let ext = path
             .extension()
@@ -104,23 +104,18 @@ impl Deref for ReadMe {
 #[derive(Debug)]
 struct PyFile {
     pub path: PathBuf,
-    code: String,
+    _code: String,
     docstring: String,
 }
 
 impl PyFile {
-    fn new(path: impl AsRef<Path>, code: &str, docstring: &str) -> Result<Self, RetCode> {
+    fn new(path: impl AsRef<Path>, code: &str, docstring: &str) -> Self {
         let path = path.as_ref().to_path_buf();
-
-        if path.extension().and_then(|ext| ext.to_str()) != Some("py") {
-            return Err(RetCode::InvalidExtension);
-        }
-
-        Ok(Self {
+        Self {
             path,
-            code: code.to_string(),
+            _code: code.to_string(),
             docstring: docstring.to_string(),
-        })
+        }
     }
 }
 
@@ -128,11 +123,12 @@ fn extract_pyfiles(file_sys: &impl FileSystem, paths: Vec<PathBuf>) -> Vec<PyFil
     paths
         .into_iter()
         .filter_map(|path| {
-            let code = file_sys.read_to_string(&path).ok()?;
-            let docstring = extract_module_docstring(&code);
-            PyFile::new(&path, &code, &docstring).ok()
+            file_sys.read_to_string(&path).ok().as_ref().map(|code| {
+                let docstring = extract_module_docstring(code);
+                PyFile::new(path, code, &docstring)
+            })
         })
-        .collect::<Vec<PyFile>>()
+        .collect()
 }
 
 fn extract_module_docstring(code: &str) -> String {
@@ -218,26 +214,23 @@ mod tests {
 
     #[test]
     fn test_generate_scripts_docs() {
-        let py_files = [
+        let py_files = vec![
             PyFile::new(
-                PathBuf::from("some/python/file1.py"),
+                "some/python/file1.py",
                 "",
                 "Description: This is a description\n\nLink: some_link.com/link1",
             ),
             PyFile::new(
-                PathBuf::from("some/python/file3.py"),
+                "some/python/file3.py",
                 "",
                 "missing description start\n\nLink: some_other_link.com/link2",
             ),
             PyFile::new(
-                PathBuf::from("some/python/file2.py"),
+                "some/python/file2.py",
                 "",
                 "Description: This is another description\n\n",
             ),
-        ]
-        .into_iter()
-        .flatten()
-        .collect();
+        ];
 
         let expected_readme = [
             "# Scripts",
