@@ -50,7 +50,6 @@ pub enum RetCode {
     NoPyFiles,
     FailedParsingFile,
     FailedToWriteReadme,
-    InvalidFilename,
 }
 
 #[derive(Debug, Eq, PartialEq)]

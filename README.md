@@ -1,4 +1,4 @@
-# readme-update
+# readme-update 🦀
 [![PyPI Downloads](https://static.pepy.tech/badge/readme-update)](https://pepy.tech/projects/readme-update)
 
 ## Tired of updating documentation?
@@ -18,12 +18,15 @@ It will update in place if the `# Scripts` block exists or else it will append i
 | `example1.py` | This is an example file that links to my own github. | [Link](https://github.com/second-ed) |
 | `example2.py` | Some other description. |  |
 | `example3.py` |  | [Link](https://doc.rust-lang.org/book/) |
-| `example_usage.py` |  |  |
 ::
 
-# To install the package
+# Installation
 ```shell
 pip install readme-update
+```
+Or
+```shell
+uv add readme-update
 ```
 
 # Usage
@@ -35,18 +38,28 @@ root/
   README.md
 ```
 
-# example_script.py
-```python
-import readme_update
-from pathlib import Path
-
-path = Path(__file__)
-
-readme_update.py_main(
-    str(path.parent),
-    str(path.parents[1] / "README.md")
-)
+```shell
+uv run -m readme-update \
+--scripts-root "./scripts" \
+--readme-path "./README.md"
 ```
+
+
+# Args
+| Argument           | Type                  | Required | Default | Description                                          |
+| ------------------ | --------------------- | -------- | ------- | ---------------------------------------------------- |
+| `--scripts-root`      | `str`                 | ✅       |  | Path to the root of the scripts to scan           |
+| `--readme-path`    | `str`                 | ❌       | `'./README.md'` | Path to the README file that will be modified        |
+
+
+# Ret codes
+| RetCode               | int | description           |
+| ----------------------| --- | --------------------- |
+| `NoModification`      | 0   | The Repo Map reflects the current state of the repo. |
+| `ModifiedReadme`      | 1   | The README was updated. |
+| `NoPyFiles`   | 2   | No python files found at the `scripts-root` location. |
+| `FailedParsingFile` | 3   | Failed to read README file  |
+| `FailedToWriteReadme`     | 4   | The given `README.md` path does not match the expected basename. |
 
 
 # Repo map
@@ -62,8 +75,7 @@ readme_update.py_main(
 ├── scripts
 │   ├── example1.py
 │   ├── example2.py
-│   ├── example3.py
-│   └── example_usage.py
+│   └── example3.py
 ├── src
 │   ├── core
 │   │   ├── adapters.rs

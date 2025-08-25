@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--readme-path",
         type=os.path.abspath,
-        required=True,
+        default="./README.md",
         help="Path to the readme file.",
     )
     args = parser.parse_args()

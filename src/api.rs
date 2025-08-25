@@ -12,7 +12,6 @@ fn py_main(scripts_root: String, readme_path: String) -> PyResult<i8> {
         RetCode::NoPyFiles => Ok(2),
         RetCode::FailedParsingFile => Ok(3),
         RetCode::FailedToWriteReadme => Ok(4),
-        RetCode::InvalidFilename => Ok(5),
     }
 }
 
