@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "readme-update"
-version = "0.1.2"
+version = "0.2.0"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -12,14 +12,25 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
 license = { text = "MIT" }
 dependencies = []
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
+module-name = "readme_update"
+python-source = "python"
+python-packages = ["update_readme"]
+strip = true
 
 [tool.uv]
 # Rebuild package when any rust files change
 cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+    "repo-mapper-rs>=0.1.0",
+    "ruff>=0.12.5",
+]
 # Uncomment to build rust code in development mode
 # config-settings = { build-args = '--profile=dev' }
