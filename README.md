@@ -1,4 +1,7 @@
-# Tired of updating documentation?
+# readme-update
+[![PyPI Downloads](https://static.pepy.tech/badge/readme-update)](https://pepy.tech/projects/readme-update)
+
+## Tired of updating documentation?
 This tool updates your `README.md` with a one line description for each of the python scripts in a directory you point it to (and recursively). It adds the text for lines that start with `"Description: "` and `"Link: "`. It ignores any that don't have the description.
 
 The idea is that links should link to higher level documentation (if it exists).
