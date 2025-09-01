@@ -39,7 +39,7 @@ root/
 ```
 
 ```shell
-uv run -m readme-update \
+uv run -m update_readme \
 --scripts-root "./scripts" \
 --readme-path "./README.md"
 ```
