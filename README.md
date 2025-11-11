@@ -4,6 +4,8 @@
 ## Tired of updating documentation?
 This tool updates your `README.md` with a one line description for each of the python scripts in a directory you point it to (and recursively). It adds the text for lines that start with `"Description: "` and `"Link: "`. It ignores any that don't have the description.
 
+You can supply alternative `--table-fields` to create a table with columns for the provided fields. The `--link-fields` argument is used to signal which of the `--table-fields` should be rendered as links like this `[Link](this/is/the/link)`.
+
 The idea is that links should link to higher level documentation (if it exists).
 
 This can be used as a `pre-commit` for python projects with standalone scripts for specific processes.
@@ -11,6 +13,8 @@ This can be used as a `pre-commit` for python projects with standalone scripts f
 It will update in place if the `# Scripts` block exists or else it will append it to the end of the `README.md`
 
 `example_usage.py` shows how to call the script from python.
+
+# Here is an example output from the tool:
 
 # Scripts
 | Name | Description | Link |
@@ -50,6 +54,8 @@ uv run -m update_readme \
 | ------------------ | --------------------- | -------- | ------- | ---------------------------------------------------- |
 | `--scripts-root`      | `str`                 | ✅       |  | Path to the root of the scripts to scan           |
 | `--readme-path`    | `str`                 | ❌       | `'./README.md'` | Path to the README file that will be modified        |
+| `--table-fields` | `list`                 | ❌ | `["Description", "Link"]` | Fields to dynamically add to the README.md table. |
+| `--link-fields` | `list`                 | ❌ | `["Link"]` | Which of the provided table fields should be rendered as links. |
 
 
 # Ret codes
@@ -60,6 +66,7 @@ uv run -m update_readme \
 | `NoPyFiles`   | 2   | No python files found at the `scripts-root` location. |
 | `FailedParsingFile` | 3   | Failed to read README file  |
 | `FailedToWriteReadme`     | 4   | The given `README.md` path does not match the expected basename. |
+| `InvalidLinkFields`     | 5   | The given `link_fields` are not a subset of the given `table_fields`. |
 
 
 # Repo map
