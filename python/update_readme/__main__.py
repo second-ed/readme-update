@@ -18,5 +18,23 @@ if __name__ == "__main__":
         default="./README.md",
         help="Path to the readme file.",
     )
+    parser.add_argument(
+        "--table-fields",
+        type=list,
+        default=["Description", "Link"],
+        help="Fields to dynamically add to the README.md table.",
+    )
+    parser.add_argument(
+        "--link-fields",
+        type=list,
+        default=["Link"],
+        help="Which of the provided table fields should be rendered as links.",
+    )
     args = parser.parse_args()
-    sys.exit(int(readme_update.py_main(args.scripts_root, args.readme_path)))
+    sys.exit(
+        int(
+            readme_update.py_main(
+                args.scripts_root, args.readme_path, args.table_fields, args.link_fields
+            )
+        )
+    )
