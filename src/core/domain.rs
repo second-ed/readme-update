@@ -3,12 +3,34 @@ use colored::Colorize;
 use rayon::prelude::*;
 use regex::Regex;
 use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
     ffi::OsStr,
     io,
     path::{Path, PathBuf},
 };
 
-pub fn main(file_sys: &mut impl FileSystem, scripts_root: String, readme_path: &Path) -> RetCode {
+pub fn main(
+    file_sys: &mut impl FileSystem,
+    scripts_root: String,
+    readme_path: &Path,
+    table_fields: &[String],
+    link_fields: &[String],
+) -> RetCode {
+    let table_set: HashSet<_> = table_fields.iter().collect();
+    if !link_fields.iter().all(|f| table_set.contains(f)) {
+        eprintln!(
+            "{} {:?} {} {:?}",
+            "Not all link fields are present in table fields. Link fields: "
+                .red()
+                .bold(),
+            link_fields,
+            "Table fields: ".red().bold(),
+            table_fields
+        );
+        return RetCode::InvalidLinkFields;
+    }
+
     let readme = match ReadMe::parse(file_sys, readme_path) {
         Ok(r) => r,
         Err(e) => {
@@ -28,7 +50,7 @@ pub fn main(file_sys: &mut impl FileSystem, scripts_root: String, readme_path: &
     }
 
     let py_files: Vec<PyFile> = extract_pyfiles(file_sys, paths);
-    let scripts_docs = generate_scripts_docs(py_files);
+    let scripts_docs = generate_scripts_docs(py_files, table_fields, link_fields);
     let modified_readme = update_readme(&readme, scripts_docs);
 
     if modified_readme != readme {
@@ -50,6 +72,7 @@ pub enum RetCode {
     NoPyFiles,
     FailedParsingFile,
     FailedToWriteReadme,
+    InvalidLinkFields,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -128,63 +151,124 @@ fn extract_module_docstring(code: &str) -> String {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct DocInfo {
-    path: PathBuf,
-    desc: String,
-    link: String,
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
+pub struct TableValue {
+    value: String,
+    is_link: bool,
 }
 
-impl DocInfo {
-    pub fn to_readme(&self) -> String {
-        let basename: String = self.path.file_name().unwrap().to_string_lossy().to_string();
-        format!("| `{}` | {} | {} |", basename, self.desc, self.link)
+impl TableValue {
+    pub fn new(value: &str, is_link: bool) -> Self {
+        Self {
+            value: value.to_string(),
+            is_link,
+        }
+    }
+
+    pub fn to_readme_entry(&self) -> String {
+        if self.is_link {
+            format!("[Link]({})", self.value)
+        } else {
+            self.value.clone()
+        }
     }
 }
 
-fn extract_docinfo(py_files: Vec<PyFile>) -> Vec<DocInfo> {
+#[derive(Debug, Eq, PartialEq)]
+pub struct DocInfo {
+    path: PathBuf,
+    table_fields: HashMap<String, TableValue>,
+}
+
+impl DocInfo {
+    pub fn to_readme(&self, table_fields: &[String]) -> String {
+        let basename: String = self.path.file_name().unwrap().to_string_lossy().to_string();
+        let cols = table_fields
+            .iter()
+            .map(|k| {
+                self.table_fields
+                    .get(k)
+                    .cloned()
+                    .unwrap_or_default()
+                    .to_readme_entry()
+            })
+            .collect::<Vec<_>>()
+            .join(" | ");
+        format!("| `{}` | {} |", basename, cols)
+    }
+}
+
+impl Ord for DocInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.path.cmp(&other.path)
+    }
+}
+
+impl PartialOrd for DocInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn extract_docinfo(
+    py_files: Vec<PyFile>,
+    table_fields: &[String],
+    link_fields: &[String],
+) -> Vec<DocInfo> {
     let mut doc_infos: Vec<DocInfo> = py_files
         .into_par_iter()
         .map(|py_file| {
-            let mut desc = String::new();
-            let mut link = String::new();
+            let mut doc_fields = HashMap::new();
 
             for line in py_file.docstring.lines() {
-                let trimmed_line = line.trim_start();
-
-                if let Some(rest) = trimmed_line.strip_prefix("Description: ") {
-                    desc = rest.to_string();
-                } else if let Some(rest) = trimmed_line.strip_prefix("Link: ") {
-                    link = format!("[Link]({})", rest);
+                let trimmed_line = line.trim();
+                for field in table_fields.iter() {
+                    let prefix = format!("{field}: ");
+                    if let Some(rest) = trimmed_line.strip_prefix(&prefix) {
+                        doc_fields.insert(
+                            field.clone(),
+                            TableValue::new(rest, link_fields.contains(field)),
+                        );
+                    }
                 }
             }
             DocInfo {
                 path: py_file.path,
-                desc,
-                link,
+                table_fields: doc_fields,
             }
         })
         .collect();
-    doc_infos.par_sort_by_key(|s| s.path.clone());
+    doc_infos.par_sort();
     doc_infos
 }
 
-fn create_readme(doc_infos: Vec<DocInfo>) -> String {
-    [
-        "# Scripts",
-        "| Name | Description | Link |",
-        "|:---|:---|:---|",
-    ]
-    .into_iter()
-    .map(str::to_string)
-    .chain(doc_infos.iter().map(|n| n.to_readme()).collect::<Vec<_>>())
-    .chain(std::iter::once("::".to_string()))
-    .collect::<Vec<_>>()
-    .join("\n")
+fn create_readme(doc_infos: Vec<DocInfo>, table_fields: &[String]) -> String {
+    let header = format!("| Name | {} |", table_fields.join(" | "));
+    let separator = format!("|{}|", vec![":---"; table_fields.len() + 1].join("|"));
+
+    std::iter::once("# Scripts".to_string())
+        .chain(std::iter::once(header))
+        .chain(std::iter::once(separator))
+        .chain(
+            doc_infos
+                .iter()
+                .map(|n| n.to_readme(table_fields))
+                .collect::<Vec<_>>(),
+        )
+        .chain(std::iter::once("::".to_string()))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
-fn generate_scripts_docs(py_files: Vec<PyFile>) -> String {
-    create_readme(extract_docinfo(py_files))
+fn generate_scripts_docs(
+    py_files: Vec<PyFile>,
+    table_fields: &[String],
+    link_fields: &[String],
+) -> String {
+    create_readme(
+        extract_docinfo(py_files, table_fields, link_fields),
+        table_fields,
+    )
 }
 
 fn update_readme(readme: &ReadMe, scripts_docs: String) -> ReadMe {
@@ -235,6 +319,13 @@ mod tests {
         .collect::<Vec<String>>()
         .join("\n");
 
-        assert_eq!(generate_scripts_docs(py_files), expected_readme);
+        assert_eq!(
+            generate_scripts_docs(
+                py_files,
+                &["Description".to_string(), "Link".to_string()],
+                &["Link".to_string()]
+            ),
+            expected_readme
+        );
     }
 }
