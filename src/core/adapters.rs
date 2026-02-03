@@ -40,6 +40,7 @@ pub struct FakeFileSystem {
 }
 
 impl FakeFileSystem {
+    #[must_use]
     pub fn new(files: HashMap<PathBuf, String>) -> Self {
         Self {
             files,
@@ -59,7 +60,7 @@ impl FileSystem for FakeFileSystem {
         self.files
             .keys()
             .filter(|p| p.extension() == Some(OsStr::new("py")))
-            .map(|p| p.to_path_buf())
+            .cloned()
             .collect()
     }
 

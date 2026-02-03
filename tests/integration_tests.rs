@@ -37,6 +37,7 @@ use test_case::test_case;
     RetCode::FailedParsingFile,
     "# Some readme"
 )]
+#[allow(clippy::needless_pass_by_value)]
 fn test_readme_update(
     scripts_root: &str,
     readme_path: &str,
@@ -63,7 +64,7 @@ fn test_readme_update(
     assert_eq!(
         main(
             &mut file_sys,
-            scripts_root,
+            &scripts_root,
             &PathBuf::from(readme_path),
             &table_fields,
             &link_fields,

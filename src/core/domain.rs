@@ -12,7 +12,7 @@ use std::{
 
 pub fn main(
     file_sys: &mut impl FileSystem,
-    scripts_root: String,
+    scripts_root: &str,
     readme_path: &Path,
     table_fields: &[String],
     link_fields: &[String],
@@ -39,12 +39,12 @@ pub fn main(
         }
     };
 
-    let paths = file_sys.list_py_files(&scripts_root);
+    let paths = file_sys.list_py_files(scripts_root);
     if paths.is_empty() {
         println!(
             "{} `{}`",
             "No files to analyse at path: ".red().bold(),
-            scripts_root.clone().yellow()
+            scripts_root.yellow()
         );
         return RetCode::NoPyFiles;
     }
@@ -57,7 +57,7 @@ pub fn main(
         if let Err(e) = modified_readme.write(file_sys, readme_path) {
             eprintln!("{} {}", "Failed to write README file: ".red().bold(), e);
             return RetCode::FailedToWriteReadme;
-        };
+        }
         println!("{}", "Modified README.md".yellow().bold());
         return RetCode::ModifiedReadme;
     }
@@ -92,8 +92,7 @@ impl ReadMe {
         let valid_file_name = path
             .file_name()
             .and_then(OsStr::to_str)
-            .map(|name| name.to_ascii_uppercase().contains("README"))
-            .unwrap_or(false);
+            .is_some_and(|name| name.to_ascii_uppercase().contains("README"));
 
         if valid_file_name && valid_ext {
             file_sys.read_to_string(path).map(ReadMe)
@@ -101,8 +100,7 @@ impl ReadMe {
             Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "File name does not contain `README` or is not valid extension in {:?}",
-                    allowed_exts
+                    "File name does not contain `README` or is not valid extension in {allowed_exts:?}"
                 ),
             ))
         }
@@ -158,6 +156,7 @@ pub struct TableValue {
 }
 
 impl TableValue {
+    #[must_use]
     pub fn new(value: &str, is_link: bool) -> Self {
         Self {
             value: value.to_string(),
@@ -165,6 +164,7 @@ impl TableValue {
         }
     }
 
+    #[must_use]
     pub fn to_readme_entry(&self) -> String {
         if self.is_link {
             format!("[Link]({})", self.value)
@@ -181,8 +181,13 @@ pub struct DocInfo {
 }
 
 impl DocInfo {
+    #[must_use]
     pub fn to_readme(&self, table_fields: &[String]) -> String {
-        let basename: String = self.path.file_name().unwrap().to_string_lossy().to_string();
+        let basename: String = self
+            .path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
         let cols = table_fields
             .iter()
             .map(|k| {
@@ -194,7 +199,7 @@ impl DocInfo {
             })
             .collect::<Vec<_>>()
             .join(" | ");
-        format!("| `{}` | {} |", basename, cols)
+        format!("| `{basename}` | {cols} |")
     }
 }
 
@@ -222,7 +227,7 @@ fn extract_docinfo(
 
             for line in py_file.docstring.lines() {
                 let trimmed_line = line.trim();
-                for field in table_fields.iter() {
+                for field in table_fields {
                     let prefix = format!("{field}: ");
                     if let Some(rest) = trimmed_line.strip_prefix(&prefix) {
                         doc_fields.insert(
@@ -242,7 +247,7 @@ fn extract_docinfo(
     doc_infos
 }
 
-fn create_readme(doc_infos: Vec<DocInfo>, table_fields: &[String]) -> String {
+fn create_readme(doc_infos: &[DocInfo], table_fields: &[String]) -> String {
     let header = format!("| Name | {} |", table_fields.join(" | "));
     let separator = format!("|{}|", vec![":---"; table_fields.len() + 1].join("|"));
 
@@ -266,7 +271,7 @@ fn generate_scripts_docs(
     link_fields: &[String],
 ) -> String {
     create_readme(
-        extract_docinfo(py_files, table_fields, link_fields),
+        &extract_docinfo(py_files, table_fields, link_fields),
         table_fields,
     )
 }

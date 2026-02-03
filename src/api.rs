@@ -4,6 +4,8 @@ use pyo3::prelude::*;
 use std::path::Path;
 
 #[pyfunction]
+#[allow(clippy::unnecessary_wraps)]
+#[allow(clippy::needless_pass_by_value)]
 fn py_main(
     scripts_root: String,
     readme_path: String,
@@ -13,7 +15,7 @@ fn py_main(
     let mut file_sys = RealFileSystem;
     match main(
         &mut file_sys,
-        scripts_root,
+        &scripts_root,
         Path::new(&readme_path),
         &table_fields,
         &link_fields,
